@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piper Joint Control</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary-color: #bb86fc;
+            --secondary-color: #03dac6;
+            --text-color: #ffffff;
+            --error-color: #cf6679;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            flex-wrap: wrap;
+        }
+
+        .container {
+            background-color: var(--surface-color);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        #canvas-container {
+            background-color: #000;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 600px;
+            height: 600px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: var(--primary-color);
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+
+        input {
+            background-color: #2c2c2c;
+            border: 1px solid #333;
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            font-weight: bold;
+        }
+
+        button.primary {
+            background-color: var(--primary-color);
+            color: black;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        #status {
+            margin-top: 20px;
+            text-align: center;
+            min-height: 20px;
+            font-size: 0.9em;
+        }
+
+        .success {
+            color: var(--secondary-color);
+        }
+
+        .error {
+            color: var(--error-color);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Piper Joint Control</h1>
+
+        <div class="control-group">
+            <div class="input-group">
+                <label>Joint 1 (deg)</label>
+                <input type="number" id="j1" value="0" step="0.1">
+            </div>
+            <div class="input-group">
+                <label>Joint 2 (deg)</label>
+                <input type="number" id="j2" value="0" step="0.1">
+            </div>
+            <div class="input-group">
+                <label>Joint 3 (deg)</label>
+                <input type="number" id="j3" value="0" step="0.1">
+            </div>
+            <div class="input-group">
+                <label>Joint 4 (deg)</label>
+                <input type="number" id="j4" value="0" step="0.1">
+            </div>
+            <div class="input-group">
+                <label>Joint 5 (deg)</label>
+                <input type="number" id="j5" value="0" step="0.1">
+            </div>
+            <div class="input-group">
+                <label>Joint 6 (deg)</label>
+                <input type="number" id="j6" value="0" step="0.1">
+            </div>
+        </div>
+
+        <div class="control-group" style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
+            <div class="input-group" style="grid-column: span 2;">
+                <label>Gripper Control (0-100)</label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="secondary" onclick="setGripper(0)">Close</button>
+                    <input type="range" id="gripper" min="0" max="100" value="0" style="flex-grow: 1;"
+                        onchange="moveGripperFromSlider()">
+                    <span id="gripper-val" style="min-width: 30px; text-align: center;">0</span>
+                    <button class="secondary" onclick="setGripper(100)">Open</button>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="control-group" style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
+            <h3 style="grid-column: span 2; margin-top: 0; color: var(--primary-color);">End Pose Control</h3>
+            <div class="input-group">
+                <label>X (mm)</label>
+                <input type="number" id="ep_x" value="0">
+            </div>
+            <div class="input-group">
+                <label>RX (deg)</label>
+                <input type="number" id="ep_rx" value="0">
+            </div>
+            <div class="input-group">
+                <label>Y (mm)</label>
+                <input type="number" id="ep_y" value="0">
+            </div>
+            <div class="input-group">
+                <label>RY (deg)</label>
+                <input type="number" id="ep_ry" value="0">
+            </div>
+            <div class="input-group">
+                <label>Z (mm)</label>
+                <input type="number" id="ep_z" value="0">
+            </div>
+            <div class="input-group">
+                <label>RZ (deg)</label>
+                <input type="number" id="ep_rz" value="0">
+            </div>
+            <div style="grid-column: span 2; display: flex; gap: 10px;">
+                <button class="secondary" onclick="getCurrentPose()">Get Current Pose</button>
+                <button class="primary" onclick="moveEndPose()">Move to Pose</button>
+            </div>
+        </div>
+        <button class="primary" onclick="moveJoints()">Move Joints Only</button>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #333; margin: 30px 0;">
+
+    <h2>Current State (Live)</h2>
+    <div class="control-group">
+        <div class="input-group">
+            <label>J1</label>
+            <input type="text" id="fb_j1" value="--" disabled style="color: #aaa;">
+        </div>
+        <div class="input-group">
+            <label>J2</label>
+            <input type="text" id="fb_j2" value="--" disabled style="color: #aaa;">
+        </div>
+        <div class="input-group">
+            <label>J3</label>
+            <input type="text" id="fb_j3" value="--" disabled style="color: #aaa;">
+        </div>
+        <div class="input-group">
+            <label>J4</label>
+            <input type="text" id="fb_j4" value="--" disabled style="color: #aaa;">
+        </div>
+        <div class="input-group">
+            <label>J5</label>
+            <input type="text" id="fb_j5" value="--" disabled style="color: #aaa;">
+        </div>
+        <div class="input-group">
+            <label>J6</label>
+            <input type="text" id="fb_j6" value="--" disabled style="color: #aaa;">
+        </div>
+    </div>
+
+    <div id="status">Ready</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+
+    <script>
+        async function moveGripper(val) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = 'Sending gripper command...';
+
+            // Update slider visual if called from buttons
+            document.getElementById('gripper').value = val;
+            document.getElementById('gripper-val').textContent = val;
+
+            try {
+                const response = await fetch('/api/move_gripper', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ gripper: parseInt(val) })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    statusEl.textContent = 'Gripper moved';
+                    statusEl.className = 'success';
+                } else {
+                    statusEl.textContent = 'Error: ' + result.message;
+                    statusEl.className = 'error';
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function getCurrentPose() {
+            try {
+                const response = await fetch('/api/current_state');
+                const result = await response.json();
+                if (result.success) {
+                    const p = result.end_pose;
+                    document.getElementById('ep_x').value = p.x.toFixed(2);
+                    document.getElementById('ep_y').value = p.y.toFixed(2);
+                    document.getElementById('ep_z').value = p.z.toFixed(2);
+                    document.getElementById('ep_rx').value = p.rx.toFixed(2);
+                    document.getElementById('ep_ry').value = p.ry.toFixed(2);
+                    document.getElementById('ep_rz').value = p.rz.toFixed(2);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function moveEndPose() {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = 'Sending pose command...';
+            statusEl.className = '';
+
+            const data = {
+                x: parseFloat(document.getElementById('ep_x').value),
+                y: parseFloat(document.getElementById('ep_y').value),
+                z: parseFloat(document.getElementById('ep_z').value),
+                rx: parseFloat(document.getElementById('ep_rx').value),
+                ry: parseFloat(document.getElementById('ep_ry').value),
+                rz: parseFloat(document.getElementById('ep_rz').value),
+                gripper: parseInt(document.getElementById('gripper').value)
+            };
+
+            try {
+                const response = await fetch('/api/move', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    statusEl.textContent = 'Pose command sent';
+                    statusEl.className = 'success';
+                } else {
+                    statusEl.textContent = 'Error: ' + result.message;
+                    statusEl.className = 'error';
+                }
+            } catch (err) {
+                statusEl.textContent = 'Network Error: ' + err.message;
+                statusEl.className = 'error';
+            }
+        }
+
+        function setGripper(val) {
+            moveGripper(val);
+        }
+
+        function moveGripperFromSlider() {
+            const val = document.getElementById('gripper').value;
+            // Update label
+            document.getElementById('gripper-val').textContent = val;
+            // Send command
+            moveGripper(val);
+        }
+
+        // --- 3D Visualization Logic ---
+        let scene, camera, renderer, robotJointGroups = [];
+
+        // Exact DH Params from piper_fk.py (dh_is_offset = 0x01)
+        // a (mm -> m), alpha (rad), d (mm -> m), theta_offset (rad)
+        const DHParams = [
+            { a: 0.0, alpha: 0.0, d: 0.123, theta: 0.0 },
+            { a: 0.0, alpha: -1.570796327, d: 0.0, theta: -172.22 * Math.PI / 180 },
+            { a: 0.28503, alpha: 0.0, d: 0.0, theta: -102.78 * Math.PI / 180 },
+            { a: -0.02198, alpha: 1.570796327, d: 0.25075, theta: 0.0 },
+            { a: 0.0, alpha: -1.570796327, d: 0.0, theta: 0.0 },
+            { a: 0.0, alpha: 1.570796327, d: 0.091, theta: 0.0 }
+        ];
+
+        // Ported from piper_fk.py __LinkTransformtion
+        function calculateLinkMatrix(alpha, a, theta, d) {
+            const calpha = Math.cos(alpha);
+            const salpha = Math.sin(alpha);
+            const ctheta = Math.cos(theta);
+            const stheta = Math.sin(theta);
+
+            const m = new THREE.Matrix4();
+            m.set(
+                ctheta, -stheta, 0, a,
+                stheta * calpha, ctheta * calpha, -salpha, -d * salpha,
+                stheta * salpha, ctheta * salpha, calpha, d * calpha,
+                0, 0, 0, 1
+            );
+            return m;
+        }
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            if (!container) return;
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a); // Slightly darker bg
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 10);
+            camera.position.set(0.8, 0.5, 0.8); // Adjusted view
+            camera.lookAt(0, 0.2, 0);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            container.appendChild(renderer.domElement);
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(2, 5, 2);
+            scene.add(dirLight);
+
+            // Grid & Axes
+            const gridHelper = new THREE.GridHelper(1, 10, 0x555555, 0x333333);
+            scene.add(gridHelper);
+            const axesHelper = new THREE.AxesHelper(0.3);
+            // Rotate axes to match Robot's Z-up coordinate system (Blue=Up)
+            axesHelper.rotation.x = -Math.PI / 2;
+            scene.add(axesHelper);
+
+            // Controls
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.target.set(0, 0.2, 0);
+
+            // Robot
+            robotJointGroups = buildPiperModel();
+
+            // Animation Loop
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update();
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            // Resize listener
+            window.addEventListener('resize', () => {
+                const w = container.clientWidth;
+                const h = container.clientHeight;
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+            });
+        }
+
+        function buildPiperModel() {
+            const matLink = new THREE.MeshPhongMaterial({ color: 0xeeeeee });
+            const matJoint = new THREE.MeshPhongMaterial({ color: 0x333333 });
+            const matGripper = new THREE.MeshPhongMaterial({ color: 0x555555 });
+
+            const jointGroups = [];
+
+            // Root group to align Z-up robot to Y-up scene
+            const robotRoot = new THREE.Group();
+            robotRoot.rotation.x = -Math.PI / 2;
+            scene.add(robotRoot);
+
+            let parent = robotRoot;
+
+            // Base Visual (Fixed to Root)
+            const mBase = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.04, 32), matJoint);
+            mBase.rotation.x = Math.PI / 2; // Cylinder along Z (up in robot frame)
+            mBase.position.z = 0.02;
+            robotRoot.add(mBase);
+
+            // Create Chain of Groups (Frames)
+            for (let i = 0; i < 6; i++) {
+                const g = new THREE.Group();
+                parent.add(g);
+                jointGroups.push(g);
+                parent = g;
+            }
+
+            const jg = jointGroups;
+
+            // --- Visuals attached to Frames ---
+
+            // J1 Housing (Base Turret)
+            // Frame 1 is at d=0.123 (Z). 
+            // This housing sits at the base (Frame 0) effectively, but moves with Link 1? 
+            // No, Base is static. J1 Housing rotates? 
+            // Usually J1 rotates the whole turret.
+            const j1Housing = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.1, 32), matJoint);
+            j1Housing.rotation.x = Math.PI / 2; // Align to Z
+            j1Housing.position.z = -0.05; // Backwards from Frame 1
+            jg[0].add(j1Housing);
+
+            // Link 1 (Vertical Post)
+            // Connects Base (Frame 0) to Shoulder (Frame 1).
+            // Span d=0.123 along Z.
+            const link1 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.123, 32), matLink);
+            link1.rotation.x = Math.PI / 2; // Align to Z
+            link1.position.z = -0.123 / 2; // Center along Z
+            jg[0].add(link1);
+
+            // J2 (Shoulder) Housing
+            const j2Housing = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.1, 32), matJoint);
+            j2Housing.rotation.x = Math.PI / 2; // Align to Z-axis (Joint Pitch Axis)
+            jg[1].add(j2Housing);
+
+            // Link 2 (Upper Arm) - Connects J2 to J3 (along X)
+            // a=0.285 along X.
+            const link2 = new THREE.Mesh(new THREE.BoxGeometry(0.285, 0.05, 0.05), matLink);
+            link2.position.x = 0.285 / 2; // Center along X
+            jg[1].add(link2);
+
+            // J3 (Elbow) Housing
+            const j3Housing = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.08, 32), matJoint);
+            // J3 axis is parallel to J2?
+            // Piper J3 is Pitch. J2 is Pitch.
+            // Frame 3 Z axis.
+            // Let's orient housing along Z (J3 axis).
+            j3Housing.rotation.x = Math.PI / 2;
+            jg[2].add(j3Housing);
+
+            // Link 3 (Forearm) - Connects J3 to J4
+            // DHParams[3]: d=0.25075, a=-0.02198.
+            // Connects (0,0) to (a, -d).
+            // Rotate box to bridge this offset.
+            const link3 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2517, 0.04), matLink); // Slightly longer hypotenuse?
+            // Angle to tilt:
+            const tilt = -Math.atan(0.02198 / 0.25075);
+            link3.rotation.z = tilt;
+            link3.position.y = -0.25075 / 2;
+            link3.position.x = -0.02198 / 2;
+            jg[2].add(link3);
+
+            // J4 (Wrist 1) Housing
+            // Pitch/Roll?
+            const j4Housing = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 32), matJoint);
+            // Default Cylinder is along Y. Z3 axis maps to -Y4. So Y alignment is correct for J4 Roll axis.
+            // Shift proximal (Towards Elbow). Elbow is at +Y relative to Frame 4 (since Z3->-Y4).
+            //j4Housing.position.y = 0.04;
+            jg[3].add(j4Housing);
+
+            // J5 (Wrist 2) - Visual for the joint housing
+            const j5Housing = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 32), matJoint);
+            j5Housing.rotation.x = Math.PI / 2; // Align to Z-axis
+            jg[4].add(j5Housing);
+
+            // J6 (Wrist 3) Housing
+            const j6Housing = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.12, 32), matJoint);
+            j6Housing.rotation.x = Math.PI / 2; // Along Z (end effector axis)
+            jg[5].add(j6Housing);
+
+            // Gripper
+            const grp = new THREE.Group();
+            grp.position.z = 0.091; // Offset by DHParams[5].d (along Z, not Y)
+            grp.rotation.z = Math.PI / 2; // Rotate gripper 90 degrees so fingers move along "World X" visually
+            jg[5].add(grp);
+
+            // Build gripper oriented along Z
+            const grpBase = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.08), matGripper);
+            grp.add(grpBase);
+
+            // Fingers usually move along X or Y. 
+            // Changing to slide along X, and point along Z.
+            const fL = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.02, 0.06), matGripper);
+            fL.position.set(0.015, 0, 0.07); // Slightly right, Forward along Z
+            fL.name = "FingerL";
+            grp.add(fL);
+
+            const fR = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.02, 0.06), matGripper);
+            fR.position.set(-0.015, 0, 0.07); // Slightly left
+            fR.name = "FingerR";
+            grp.add(fR);
+
+            return jointGroups;
+        }
+
+        function updateRobotVisuals(angles, gripperValue = 0) {
+            if (robotJointGroups.length === 0) return;
+
+            // Apply transformations for each joint
+            // The DH parameters define the transformation from frame i-1 to frame i.
+            // So, jointGroups[i] (representing Frame i) gets the matrix calculated from DHParams[i].
+            // Note: DHParams array is 0-indexed, corresponding to Frame 1 to Frame 6.
+            // So DHParams[0] is for Frame 1, applied to robotJointGroups[0].
+            for (let i = 0; i < 6; i++) {
+                const group = robotJointGroups[i];
+                const deg = angles[i] || 0;
+                const rad = deg * Math.PI / 180;
+                const p = DHParams[i];
+
+                // The 'theta' in DHParams is the offset. The actual joint angle is 'rad'.
+                const currentTheta = rad + p.theta;
+
+                // Use the exact matrix calculation
+                const m = calculateLinkMatrix(p.alpha, p.a, currentTheta, p.d);
+
+                group.matrix.copy(m);
+                group.matrixAutoUpdate = false;
+            }
+
+            // Gripper
+            if (gripperValue === undefined) gripperValue = 0;
+            const halfWidth = (gripperValue / 1000.0) / 2.0;
+
+            const g6 = robotJointGroups[5];
+            const fingerL = g6.getObjectByName("FingerL");
+            const fingerR = g6.getObjectByName("FingerR");
+
+            if (fingerL && fingerR) {
+                const minPos = 0.015;
+                // Animate along X
+                fingerL.position.x = minPos + halfWidth;
+                fingerR.position.x = -(minPos + halfWidth);
+            }
+        }
+
+        // Polling loop
+        async function pollState() {
+            try {
+                const response = await fetch('/api/current_state');
+                const result = await response.json();
+                if (result.success) {
+                    const j = result.joints;
+                    const g = result.gripper || 0;
+                    // UI
+                    document.getElementById('fb_j1').value = j.j1.toFixed(3);
+                    document.getElementById('fb_j2').value = j.j2.toFixed(3);
+                    document.getElementById('fb_j3').value = j.j3.toFixed(3);
+                    document.getElementById('fb_j4').value = j.j4.toFixed(3);
+                    document.getElementById('fb_j5').value = j.j5.toFixed(3);
+                    document.getElementById('fb_j6').value = j.j6.toFixed(3);
+                    // Visual
+                    updateRobotVisuals([j.j1, j.j2, j.j3, j.j4, j.j5, j.j6], g);
+                }
+            } catch (e) {
+                console.error("Fetch error", e);
+            }
+            setTimeout(pollState, 100);
+        }
+
+        async function moveJoints() {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = 'Sending command...';
+            statusEl.className = '';
+
+            const data = {
+                j1: parseFloat(document.getElementById('j1').value),
+                j2: parseFloat(document.getElementById('j2').value),
+                j3: parseFloat(document.getElementById('j3').value),
+                j4: parseFloat(document.getElementById('j4').value),
+                j5: parseFloat(document.getElementById('j5').value),
+                j6: parseFloat(document.getElementById('j6').value),
+                gripper: parseInt(document.getElementById('gripper').value)
+            };
+
+            try {
+                const response = await fetch('/api/move_joints', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    statusEl.textContent = 'Command sent successfully';
+                    statusEl.className = 'success';
+                } else {
+                    statusEl.textContent = 'Error: ' + result.message;
+                    statusEl.className = 'error';
+                }
+            } catch (err) {
+                statusEl.textContent = 'Network Error: ' + err.message;
+                statusEl.className = 'error';
+            }
+        }
+
+        window.onload = function () {
+            init3D();
+            pollState();
+            getCurrentPose();
+
+            // Slider
+            document.getElementById('gripper').addEventListener('input', function (e) {
+                document.getElementById('gripper-val').textContent = e.target.value;
+            });
+        };
+    </script>
+</body>
+
+</html>

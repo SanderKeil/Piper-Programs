@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piper Component Control</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary-color: #bb86fc;
+            --secondary-color: #03dac6;
+            --text-color: #ffffff;
+            --error-color: #cf6679;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            flex-wrap: wrap;
+        }
+
+        .container {
+            background-color: var(--surface-color);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: var(--primary-color);
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #aaa;
+        }
+
+        input {
+            background-color: #2c2c2c;
+            border: 1px solid #333;
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            font-weight: bold;
+        }
+
+        button.primary {
+            background-color: var(--primary-color);
+            color: black;
+        }
+
+        button.secondary {
+            background-color: var(--secondary-color);
+            color: black;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        #status {
+            margin-top: 20px;
+            text-align: center;
+            min-height: 20px;
+            font-size: 0.9em;
+        }
+
+        .success {
+            color: var(--secondary-color);
+        }
+
+        .error {
+            color: var(--error-color);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Piper Control</h1>
+
+        <div class="control-group">
+            <div class="input-group">
+                <label>X (mm)</label>
+                <input type="number" id="x" value="55" step="1">
+            </div>
+            <div class="input-group">
+                <label>Y (mm)</label>
+                <input type="number" id="y" value="0" step="1">
+            </div>
+            <div class="input-group">
+                <label>Z (mm)</label>
+                <input type="number" id="z" value="206" step="1">
+            </div>
+            <div class="input-group">
+                <label>Gripper</label>
+                <input type="number" id="gripper" value="0">
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="input-group">
+                <label>RX (degrees)</label>
+                <input type="number" id="rx" value="0" step="1">
+            </div>
+            <div class="input-group">
+                <label>RY (degrees)</label>
+                <input type="number" id="ry" value="85" step="1">
+            </div>
+            <div class="input-group">
+                <label>RZ (degrees)</label>
+                <input type="number" id="rz" value="0" step="1">
+            </div>
+        </div>
+
+        <div class="buttons">
+            <button class="secondary" onclick="resetToZero()">Reset to Zero</button>
+            <button class="primary" onclick="moveToPose()">Move to Pose</button>
+        </div>
+
+        <div id="status">Ready</div>
+    </div>
+
+    <script>
+        // Called when user types in Input fields (Placeholder if needed later)
+        function updatePreviewFromInput() {
+            // No 3D preview to update
+        }
+
+        window.onload = function () {
+            // Initial load logic if any
+        };
+
+
+        // --- Existing App Logic ---
+        const ZERO_POSE = {
+            x: 55,
+            y: 0,
+            z: 206,
+            rx: 0,
+            ry: 85,
+            rz: 0,
+            gripper: 0
+        };
+
+        function resetToZero() {
+            document.getElementById('x').value = ZERO_POSE.x;
+            document.getElementById('y').value = ZERO_POSE.y;
+            document.getElementById('z').value = ZERO_POSE.z;
+            document.getElementById('rx').value = ZERO_POSE.rx;
+            document.getElementById('ry').value = ZERO_POSE.ry;
+            document.getElementById('rz').value = ZERO_POSE.rz;
+            document.getElementById('gripper').value = ZERO_POSE.gripper;
+            updatePreviewFromInput();
+            moveToPose();
+        }
+
+        async function moveToPose() {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = 'Sending command...';
+            statusEl.className = '';
+
+            const data = {
+                x: parseFloat(document.getElementById('x').value),
+                y: parseFloat(document.getElementById('y').value),
+                z: parseFloat(document.getElementById('z').value),
+                rx: parseFloat(document.getElementById('rx').value),
+                ry: parseFloat(document.getElementById('ry').value),
+                rz: parseFloat(document.getElementById('rz').value),
+                gripper: parseInt(document.getElementById('gripper').value)
+            };
+
+            try {
+                const response = await fetch('/api/move', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    statusEl.textContent = 'Command sent successfully';
+                    statusEl.className = 'success';
+                } else {
+                    statusEl.textContent = 'Error: ' + result.message;
+                    statusEl.className = 'error';
+                }
+            } catch (err) {
+                statusEl.textContent = 'Network Error: ' + err.message;
+                statusEl.className = 'error';
+            }
+        }
+    </script>
+</body>
+
+</html>

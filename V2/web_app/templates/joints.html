@@ -507,7 +507,8 @@
             // DHParams[3]: d=0.25075, a=-0.02198.
             // Connects (0,0) to (a, -d).
             // Rotate box to bridge this offset.
-            const link3 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2517, 0.04), matLink); // Slightly longer hypotenuse?
+            // User requested 15% shorter visual (0.25 * 0.85 = 0.2125)
+            const link3 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.2125, 0.04), matLink);
             // Angle to tilt:
             const tilt = -Math.atan(0.02198 / 0.25075);
             link3.rotation.z = tilt;
@@ -517,10 +518,12 @@
 
             // J4 (Wrist 1) Housing
             // Pitch/Roll?
-            const j4Housing = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 32), matJoint);
-            // Default Cylinder is along Y. Z3 axis maps to -Y4. So Y alignment is correct for J4 Roll axis.
-            // Shift proximal (Towards Elbow). Elbow is at +Y relative to Frame 4 (since Z3->-Y4).
-            //j4Housing.position.y = 0.04;
+            const j4Housing = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.05, 32), matJoint);
+            // User requested alignment with Link 3 (which is along -Y_3 = -Z_4).
+            // So align cylinder with Z axis.
+            j4Housing.rotation.x = Math.PI / 2;
+            // Shift proximal (Towards Elbow). Elbow is at -Z in Frame 4.
+            j4Housing.position.z = -0.04;
             jg[3].add(j4Housing);
 
             // J5 (Wrist 2) - Visual for the joint housing

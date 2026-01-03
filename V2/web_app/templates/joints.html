@@ -53,15 +53,49 @@
         }
 
         h1 {
-            text-align: center;
-            margin-bottom: 30px;
             color: var(--primary-color);
+            margin: 0;
+        }
+
+        .header-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-can {
+            background-color: var(--secondary-color);
+            color: #000;
+        }
+
+        .status-teach {
+            background-color: #ff9800;
+            color: #000;
+        }
+
+        .status-standby {
+            background-color: #555;
+            color: #fff;
+        }
+
+        .status-offline {
+            background-color: #333;
+            color: #777;
+            border: 1px solid #555;
         }
 
         .control-group {
-            margin-bottom: 20px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
             gap: 15px;
         }
 
@@ -135,7 +169,12 @@
 
 <body>
     <div class="container">
-        <h1>Piper Joint Control</h1>
+        <div class="header-container">
+            <h1>Piper Joint Control</h1>
+            <div id="robot-status-badge" class="status-badge status-offline">Offline</div>
+            <button class="primary" style="font-size: 0.8em; padding: 5px 10px;" onclick="enableCANControl()">Enable CAN
+                Control</button>
+        </div>
 
         <div class="control-group">
             <div class="input-group">
@@ -210,6 +249,74 @@
             </div>
         </div>
         <button class="primary" onclick="moveJoints()">Move Joints Only</button>
+
+        <div class="control-group" style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
+            <h3 style="grid-column: span 2; margin-top: 0; color: var(--primary-color);">Pose Sequencer</h3>
+
+            <div style="grid-column: span 2; display: flex; gap: 10px; margin-bottom: 20px;">
+                <button class="secondary" onclick="capturePose()">Capture Current Pose</button>
+                <button class="secondary" onclick="addGripperAction(0)">Add Gripper Close</button>
+                <button class="secondary" onclick="addGripperAction(100)">Add Gripper Open</button>
+                <button class="primary" onclick="playSequence()">Play Sequence</button>
+                <button class="error-btn" style="background-color: var(--error-color); color: white;"
+                    onclick="stopSequence()">Stop</button>
+            </div>
+
+            <div class="input-group" style="grid-column: span 2;">
+                <label>Pause Duration (sec)</label>
+                <input type="number" id="seq-interval" value="2.0" step="0.5" style="width: 100px;">
+            </div>
+
+            <style>
+                #pose-list {
+                    list-style: none;
+                    padding: 0;
+                    margin: 0;
+                    grid-column: span 2;
+                }
+
+                .pose-item {
+                    background: #2c2c2c;
+                    margin-bottom: 8px;
+                    padding: 10px;
+                    border-radius: 6px;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    border: 1px solid #444;
+                    cursor: grab;
+                }
+
+                .pose-item.dragging {
+                    opacity: 0.5;
+                    border-color: var(--primary-color);
+                }
+
+                .pose-name {
+                    flex-grow: 1;
+                    background: transparent;
+                    border: none;
+                    color: white;
+                    font-size: 1em;
+                    cursor: text;
+                }
+
+                .pose-conf {
+                    font-family: monospace;
+                    font-size: 0.8em;
+                    color: #888;
+                }
+
+                .btn-sm {
+                    padding: 5px 10px;
+                    font-size: 0.8em;
+                }
+            </style>
+
+            <ul id="pose-list">
+                <!-- Poses will be added here -->
+            </ul>
+        </div>
     </div>
 
     <hr style="border: 0; border-top: 1px solid #333; margin: 30px 0;">
@@ -288,9 +395,40 @@
                     document.getElementById('ep_rx').value = p.rx.toFixed(2);
                     document.getElementById('ep_ry').value = p.ry.toFixed(2);
                     document.getElementById('ep_rz').value = p.rz.toFixed(2);
+
+                    const j = result.joints;
+                    document.getElementById('j1').value = j.j1.toFixed(2);
+                    document.getElementById('j2').value = j.j2.toFixed(2);
+                    document.getElementById('j3').value = j.j3.toFixed(2);
+                    document.getElementById('j4').value = j.j4.toFixed(2);
+                    document.getElementById('j5').value = j.j5.toFixed(2);
+                    document.getElementById('j6').value = j.j6.toFixed(2);
                 }
             } catch (e) {
                 console.error(e);
+            }
+        }
+
+        // --- Control Functions ---
+
+        async function enableCANControl() {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = 'Enabling CAN Control...';
+
+            try {
+                const response = await fetch('/api/enable_can', { method: 'POST' });
+                const result = await response.json();
+                if (result.success) {
+                    statusEl.textContent = 'Switched to CAN Control';
+                    statusEl.className = 'success';
+                } else {
+                    statusEl.textContent = 'Error: ' + result.message;
+                    statusEl.className = 'error';
+                }
+            } catch (err) {
+                console.error(err);
+                statusEl.textContent = 'Network Error';
+                statusEl.className = 'error';
             }
         }
 
@@ -618,6 +756,26 @@
                     document.getElementById('fb_j6').value = j.j6.toFixed(3);
                     // Visual
                     updateRobotVisuals([j.j1, j.j2, j.j3, j.j4, j.j5, j.j6], g);
+
+                    // Status Badge Update
+                    if (result.meta) {
+                        const badge = document.getElementById('robot-status-badge');
+                        const mode = result.meta.ctrl_mode;
+                        // 1: CAN, 2: TEACH, 0: STANDBY
+                        if (mode === 1) {
+                            badge.textContent = 'CAN Control';
+                            badge.className = 'status-badge status-can';
+                        } else if (mode === 2) {
+                            badge.textContent = 'Teaching';
+                            badge.className = 'status-badge status-teach';
+                        } else if (mode === 0) {
+                            badge.textContent = 'Standby';
+                            badge.className = 'status-badge status-standby';
+                        } else {
+                            badge.textContent = 'Status: ' + mode;
+                            badge.className = 'status-badge status-offline';
+                        }
+                    }
                 }
             } catch (e) {
                 console.error("Fetch error", e);
@@ -660,6 +818,253 @@
                 statusEl.textContent = 'Network Error: ' + err.message;
                 statusEl.className = 'error';
             }
+        }
+
+        // --- Pose Sequencer Logic ---
+        let poseList = [];
+        let isPlaying = false;
+
+        function capturePose() {
+            // Read from FEEDBACK fields (actual robot state)
+            const j1 = parseFloat(document.getElementById('fb_j1').value) || 0;
+            const j2 = parseFloat(document.getElementById('fb_j2').value) || 0;
+            const j3 = parseFloat(document.getElementById('fb_j3').value) || 0;
+            const j4 = parseFloat(document.getElementById('fb_j4').value) || 0;
+            const j5 = parseFloat(document.getElementById('fb_j5').value) || 0;
+            const j6 = parseFloat(document.getElementById('fb_j6').value) || 0;
+            const gripper = parseInt(document.getElementById('gripper').value) || 0;
+
+            const pose = {
+                type: 'pose',
+                name: `Pose ${poseList.length + 1}`,
+                joints: [j1, j2, j3, j4, j5, j6],
+                gripper: gripper,
+                speed: 50,
+                duration: 2000
+            };
+
+            poseList.push(pose);
+            renderPoseList();
+        }
+
+        function addGripperAction(val) {
+            const action = {
+                type: 'gripper',
+                name: val > 50 ? 'Gripper Open' : 'Gripper Close',
+                value: val,
+                speed: 100, // Not used for gripper but kept for consistency
+                duration: 500
+            };
+            poseList.push(action);
+            renderPoseList();
+        }
+
+        function renderPoseList() {
+            const list = document.getElementById('pose-list');
+            list.innerHTML = '';
+
+            poseList.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.className = 'pose-item';
+                li.draggable = true;
+                li.dataset.index = index;
+
+                // Drag Events
+                li.addEventListener('dragstart', handleDragStart);
+                li.addEventListener('dragover', handleDragOver);
+                li.addEventListener('drop', handleDrop);
+                li.addEventListener('dragenter', handleDragEnter);
+                li.addEventListener('dragleave', handleDragLeave);
+
+                // Name Input
+                const inputName = document.createElement('input');
+                inputName.type = 'text';
+                inputName.className = 'pose-name';
+                inputName.value = item.name;
+                inputName.onchange = (e) => { item.name = e.target.value; };
+                inputName.style.flexGrow = '2';
+
+                // Speed Input
+                const inputSpeed = document.createElement('input');
+                inputSpeed.type = 'number';
+                inputSpeed.className = 'pose-name'; // reuse style
+                inputSpeed.value = item.speed;
+                inputSpeed.placeholder = 'Spd';
+                inputSpeed.title = 'Speed (0-100)';
+                inputSpeed.style.width = '50px';
+                inputSpeed.style.flexGrow = '0';
+                inputSpeed.onchange = (e) => { item.speed = parseInt(e.target.value); };
+
+                // Duration Input
+                const inputDur = document.createElement('input');
+                inputDur.type = 'number';
+                inputDur.className = 'pose-name'; // reuse style
+                inputDur.value = item.duration;
+                inputDur.placeholder = 'ms';
+                inputDur.title = 'Wait Duration (ms)';
+                inputDur.style.width = '60px';
+                inputDur.style.flexGrow = '0';
+                inputDur.onchange = (e) => { item.duration = parseInt(e.target.value); };
+
+                // Values Display
+                const span = document.createElement('span');
+                span.className = 'pose-conf';
+
+                if (item.type === 'gripper') {
+                    span.textContent = `Action: Set Gripper to ${item.value}`;
+                } else {
+                    span.textContent = `[${item.joints.map(j => Math.round(j)).join(', ')}] G:${item.gripper}`;
+                }
+
+                // Play Single Button
+                const btnPlay = document.createElement('button');
+                btnPlay.className = 'btn-sm secondary';
+                btnPlay.textContent = '▶';
+                btnPlay.onclick = () => {
+                    if (item.type === 'gripper') moveGripper(item.value);
+                    else moveToPose(item);
+                };
+
+                // Delete Button
+                const btnDel = document.createElement('button');
+                btnDel.className = 'btn-sm error-btn';
+                btnDel.textContent = '✕';
+                btnDel.onclick = () => deletePose(index);
+
+                li.appendChild(inputName);
+                if (item.type === 'pose') {
+                    li.appendChild(inputSpeed);
+                }
+                li.appendChild(inputDur);
+                li.appendChild(span);
+                li.appendChild(btnPlay);
+                li.appendChild(btnDel);
+                list.appendChild(li);
+            });
+        }
+
+        function deletePose(index) {
+            poseList.splice(index, 1);
+            renderPoseList();
+        }
+
+        async function moveToPose(pose) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = `Moving to ${pose.name}...`;
+
+            // Re-use logic from moveJoints but with passed data
+            const data = {
+                j1: pose.joints[0],
+                j2: pose.joints[1],
+                j3: pose.joints[2],
+                j4: pose.joints[3],
+                j5: pose.joints[4],
+                j6: pose.joints[5],
+                gripper: pose.gripper,
+                speed: pose.speed || 50
+            };
+
+            try {
+                const response = await fetch('/api/move_joints', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    statusEl.textContent = `Reached ${pose.name}`;
+                    statusEl.className = 'success';
+                } else {
+                    statusEl.textContent = 'Error: ' + result.message;
+                    statusEl.className = 'error';
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function playSequence() {
+            if (isPlaying) return;
+            isPlaying = true;
+            const interval = parseFloat(document.getElementById('seq-interval').value) * 1000 || 2000;
+            const statusEl = document.getElementById('status');
+
+            statusEl.textContent = 'Starting sequence...';
+
+            // Loop indefinitely? User said "cycle... with pause". Usually implies loop.
+            // Or maybe just once? "Cycle through each of the positions". 
+            // I'll make it loop once for now, or maybe toggle loop? 
+            // "Cycle through each... with pause" -> List 1..N.
+            // I'll interpret "cycle" as 1..N then stop, unless user asks for Loop. 
+            // Actually "cycle" often means Repeat. Let's do 1 pass.
+
+            for (let i = 0; i < poseList.length; i++) {
+                if (!isPlaying) break; // Check stop flag
+
+                const item = poseList[i];
+                if (item.type === 'gripper') {
+                    await moveGripper(item.value);
+                } else {
+                    await moveToPose(item);
+                }
+
+                // Wait per-step duration
+                const waitTime = item.duration || 1000;
+                await new Promise(r => setTimeout(r, waitTime));
+            }
+
+            isPlaying = false;
+            statusEl.textContent = 'Sequence finished';
+        }
+
+        function stopSequence() {
+            isPlaying = false;
+            document.getElementById('status').textContent = 'Sequence stopped';
+        }
+
+        // Drag and Drop Handlers
+        let dragSrcEl = null;
+
+        function handleDragStart(e) {
+            dragSrcEl = this;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+            this.classList.add('dragging');
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleDragEnter(e) {
+            this.classList.add('over');
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('over');
+        }
+
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+
+            if (dragSrcEl != this) {
+                // Swap data in poseList
+                const srcIdx = parseInt(dragSrcEl.dataset.index);
+                const destIdx = parseInt(this.dataset.index);
+
+                // Move item in array
+                const item = poseList.splice(srcIdx, 1)[0];
+                poseList.splice(destIdx, 0, item);
+
+                renderPoseList();
+            }
+            return false;
         }
 
         window.onload = function () {

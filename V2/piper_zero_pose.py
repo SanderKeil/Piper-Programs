@@ -60,7 +60,9 @@ if __name__ == "__main__":
     # Enable the arm first
     print("Enabling arm...")
     piper.EnableArm(7)
-    enable_fun(piper=piper, enable=True)
+    if not enable_fun(piper=piper, enable=True):
+        print("Failed to enable arm. Exiting.")
+        exit(1)
     
     # Target position
     position = [55.0, 0.0, 206.0, 0, 85.0, 0, 0]
@@ -75,12 +77,16 @@ if __name__ == "__main__":
     joint_6 = round(position[6]*factor)
     
     print("Moving to zero position...")
-    # Mode control: 0x01 for position control
-    piper.MotionCtrl_2(0x01, 0x00, 100, 0x00)
-    piper.EndPoseCtrl(X,Y,Z,RX,RY,RZ)
-    piper.GripperCtrl(abs(joint_6), 1000, 0x01, 0)
+    print("Press Ctrl+C to stop.")
+    try:
+        while True:
+            # Mode control: 0x01 for position control
+            piper.MotionCtrl_2(0x01, 0x00, 100, 0x00)
+            piper.EndPoseCtrl(X,Y,Z,RX,RY,RZ)
+            piper.GripperCtrl(abs(joint_6), 1000, 0x01, 0)
+            time.sleep(0.01)
+    except KeyboardInterrupt:
+        print("\nStopped by user.")
+        pass
     
-    # Wait for command to be sent and executed
-    time.sleep(3) 
-    print("Move command sent. Exiting.")
     exit(0)

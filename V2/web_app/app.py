@@ -21,8 +21,8 @@ app_running = True
 # Synchronization
 heartbeat_lock = threading.Lock()
 # Dynamic config: [ctrl_mode, move_mode, speed]
-# Default: CAN Control (0x01), Joint Mode (0x01), Speed 50
-current_move_config = {"ctrl_mode": 0x01, "move_mode": 0x01, "speed": 50}
+# Default: CAN Control (0x01), Joint Mode (0x01), Speed 50, Gripper Enable (0x01)
+current_move_config = {"ctrl_mode": 0x01, "move_mode": 0x01, "speed": 50, "gripper_code": 0x01}
 
 # Global Targets (Integer units as per SDK)
 target_joints = [0, 0, 0, 0, 0, 0]
@@ -84,10 +84,9 @@ def get_current_state():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/enable_can', methods=['POST'])
-@app.route('/api/enable_can', methods=['POST'])
 def enable_can_control():
     """Switches the robot to CAN Control Mode (0x01) with feedback verification."""
-    global piper, target_mode
+    global piper, target_mode, target_joints, target_end_pose, target_gripper, current_move_config
     if not piper:
         return jsonify({"success": False, "message": "Robot not connected"})
     
@@ -210,12 +209,30 @@ def enable_can_control():
         # 5. Reset Move Config to safe defaults (Joint Mode)
         current_move_config["ctrl_mode"] = 0x01
         current_move_config["move_mode"] = 0x01
-        current_move_config["speed"] = 50
+        current_move_config["speed"] = 20 # Slower start to prevent jerk
+        current_move_config["gripper_code"] = 0x01 # Normal Enable
 
         # FORCE Mode Switch once before heartbeat takes over
         # This kickstarts the transition from Standby (0) to CAN (1)
-        piper.MotionCtrl_2(0x01, 0x01, 50, 0x00)
-        time.sleep(0.05)
+        piper.MotionCtrl_2(0x01, 0x01, 20, 0x00)
+        
+        # Burst Gripper Clean: Send 0x02 (Disable/Clear) then 0x03 (Enable/Clear)
+        # This is critical to wake up a stuck gripper
+        for _ in range(3):
+            piper.GripperCtrl(abs(target_gripper), 1000, 0x02, 0)
+            time.sleep(0.01)
+        for _ in range(5):
+             piper.GripperCtrl(abs(target_gripper), 1000, 0x03, 0)
+             time.sleep(0.01)
+
+        # LATE RE-SYNC: Re-read joints one last time to minimize drift
+        joint_msgs = piper.GetArmJointMsgs()
+        target_joints = [
+            joint_msgs.joint_state.joint_1, joint_msgs.joint_state.joint_2, joint_msgs.joint_state.joint_3,
+            joint_msgs.joint_state.joint_4, joint_msgs.joint_state.joint_5, joint_msgs.joint_state.joint_6
+        ]
+        
+        time.sleep(0.02)
 
         # 6. RESUME Heartbeat
         target_mode = 0x01
@@ -237,9 +254,12 @@ def enable_can_control():
             
             time.sleep(0.05)
         
+        # Ensure heartbeat resumes even on timeout
+        target_mode = 0x01
         return jsonify({"success": False, "message": f"Timeout: Robot enabled but did not switch to CAN Control Mode. Last Mode: {ctrl_mode}"}), 504
 
     except Exception as e:
+        target_mode = 0x01
         return jsonify({'success': False, 'message': str(e)}), 500
 
 def heartbeat_loop():
@@ -264,7 +284,8 @@ def heartbeat_loop():
                     piper.EndPoseCtrl(*target_end_pose)
                 
                 # 3. Send Gripper Command
-                piper.GripperCtrl(abs(target_gripper), 1000, 0x01, 0)
+                g_code = current_move_config.get("gripper_code", 0x01)
+                piper.GripperCtrl(abs(target_gripper), 1000, g_code, 0)
                 
                 # DEBUG PROBE (Every ~1 second)
                 hb_count += 1
@@ -422,6 +443,9 @@ def move_gripper():
         
         # Update Target
         target_gripper = gripper_um
+        
+        # Reset Gripper Code to 0x01 (Standard Enable) after explicit move
+        current_move_config["gripper_code"] = 0x01
         
         # NOTE: Actual command sending is now handled by heartbeat_loop
         

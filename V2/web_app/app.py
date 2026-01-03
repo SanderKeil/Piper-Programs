@@ -282,6 +282,8 @@ def heartbeat_loop():
                     piper.JointCtrl(*target_joints)
                 elif m_mode == 0x00: # End Pose Mode
                     piper.EndPoseCtrl(*target_end_pose)
+                elif m_mode == 0x02: # Linear Mode (Move L)
+                    piper.EndPoseCtrl(*target_end_pose)
                 
                 # 3. Send Gripper Command
                 g_code = current_move_config.get("gripper_code", 0x01)
@@ -408,12 +410,19 @@ def move_robot_joints():
         # Update Target
         target_joints = [j1, j2, j3, j4, j5, j6]
 
-        # Joint control mode (0x01 CAN Ctrl, 0x01 MOVE J)
-        # Note: MotionCtrl_2(ctrl_mode, move_mode, speed, ...)
+        # Handling modes
+        move_mode = int(data.get('move_mode', 0x01)) # Default 0x01 Joint
+        end_pose_in = data.get('end_pose')
         
+        if move_mode == 0x02 and end_pose_in and len(end_pose_in) == 6:
+             # Convert MM/Deg to 0.001 units
+             global target_end_pose
+             target_end_pose = [int(float(v)*1000) for v in end_pose_in]
+             print(f"Set Linear Target: {target_end_pose}")
+
         # Update heartbeat config
         current_move_config["ctrl_mode"] = 0x01
-        current_move_config["move_mode"] = 0x01
+        current_move_config["move_mode"] = move_mode
         
         # Read speed from request, default to 50 if not provided
         speed_req = int(data.get('speed', 50))

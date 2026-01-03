@@ -257,6 +257,11 @@
                 <button class="secondary" onclick="capturePose()">Capture Current Pose</button>
                 <button class="secondary" onclick="addGripperAction(0)">Add Gripper Close</button>
                 <button class="secondary" onclick="addGripperAction(100)">Add Gripper Open</button>
+                <div style="width: 1px; background: #666; margin: 0 5px;"></div>
+                <button class="secondary" onclick="saveSequence()">Save</button>
+                <button class="secondary" onclick="document.getElementById('load-file').click()">Load</button>
+                <input type="file" id="load-file" style="display: none;" accept=".json" onchange="loadSequence(this)">
+                <div style="width: 1px; background: #666; margin: 0 5px;"></div>
                 <button class="primary" onclick="playSequence()">Play Sequence</button>
                 <button class="error-btn" style="background-color: var(--error-color); color: white;"
                     onclick="stopSequence()">Stop</button>
@@ -739,6 +744,9 @@
             }
         }
 
+        // Global state for latest feedback
+        let latestPose = null;
+
         // Polling loop
         async function pollState() {
             try {
@@ -746,7 +754,10 @@
                 const result = await response.json();
                 if (result.success) {
                     const j = result.joints;
+                    const p = result.end_pose;
                     const g = result.gripper || 0;
+
+                    latestPose = p; // Store for capture
                     // UI
                     document.getElementById('fb_j1').value = j.j1.toFixed(3);
                     document.getElementById('fb_j2').value = j.j2.toFixed(3);
@@ -838,9 +849,11 @@
                 type: 'pose',
                 name: `Pose ${poseList.length + 1}`,
                 joints: [j1, j2, j3, j4, j5, j6],
+                end_pose: latestPose ? [latestPose.x, latestPose.y, latestPose.z, latestPose.rx, latestPose.ry, latestPose.rz] : [0, 0, 0, 0, 0, 0],
                 gripper: gripper,
                 speed: 50,
-                duration: 2000
+                duration: 2000,
+                move_mode: 0x01 // Default: Joint Move (0x01)
             };
 
             poseList.push(pose);
@@ -906,6 +919,18 @@
                 inputDur.style.flexGrow = '0';
                 inputDur.onchange = (e) => { item.duration = parseInt(e.target.value); };
 
+                // Straight Line Checkbox
+                const lblLin = document.createElement('label');
+                lblLin.style.fontSize = '12px';
+                lblLin.style.display = 'flex';
+                lblLin.style.alignItems = 'center';
+                const chkLin = document.createElement('input');
+                chkLin.type = 'checkbox';
+                chkLin.checked = item.move_mode === 0x02; // 0x02 is MOVE L
+                chkLin.onchange = (e) => { item.move_mode = e.target.checked ? 0x02 : 0x01; };
+                lblLin.appendChild(chkLin);
+                lblLin.appendChild(document.createTextNode('Linear'));
+
                 // Values Display
                 const span = document.createElement('span');
                 span.className = 'pose-conf';
@@ -934,6 +959,7 @@
                 li.appendChild(inputName);
                 if (item.type === 'pose') {
                     li.appendChild(inputSpeed);
+                    li.appendChild(lblLin); // Add Checkbox
                 }
                 li.appendChild(inputDur);
                 li.appendChild(span);
@@ -961,7 +987,11 @@
                 j5: pose.joints[4],
                 j6: pose.joints[5],
                 gripper: pose.gripper,
-                speed: pose.speed || 50
+                j6: pose.joints[5],
+                gripper: pose.gripper,
+                speed: pose.speed || 50,
+                move_mode: pose.move_mode || 0x01,
+                end_pose: pose.end_pose
             };
 
             try {
@@ -1020,6 +1050,47 @@
         function stopSequence() {
             isPlaying = false;
             document.getElementById('status').textContent = 'Sequence stopped';
+        }
+
+        // --- Save/Load Logic ---
+        function saveSequence() {
+            if (poseList.length === 0) {
+                alert("Sequence is empty!");
+                return;
+            }
+            const blob = new Blob([JSON.stringify(poseList, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'piper_sequence.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function loadSequence(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (Array.isArray(data)) {
+                        poseList = data; // TODO: Add deeper validation?
+                        renderPoseList();
+                        document.getElementById('status').textContent = 'Sequence loaded successfully';
+                        document.getElementById('status').className = 'success';
+                    } else {
+                        throw new Error("Invalid file format: Not an array");
+                    }
+                } catch (err) {
+                    alert("Failed to load sequence: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+            input.value = ''; // Reset so we can reload same file if needed
         }
 
         // Drag and Drop Handlers

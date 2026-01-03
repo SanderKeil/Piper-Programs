@@ -214,6 +214,14 @@
                     <button class="secondary" onclick="setGripper(100)">Open</button>
                 </div>
             </div>
+            <div class="input-group" style="grid-column: span 2;">
+                <label>Gripper Force (0.1 - 5.0 N)</label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="range" id="gripper-effort" min="100" max="5000" value="1000" step="100"
+                        style="flex-grow: 1;" onchange="updateEffortDisplay()">
+                    <span id="effort-val" style="min-width: 50px; text-align: center;">1.0 N</span>
+                </div>
+            </div>
         </div>
 
 
@@ -361,7 +369,12 @@
 
 
     <script>
-        async function moveGripper(val) {
+        function updateEffortDisplay() {
+            const val = document.getElementById('gripper-effort').value;
+            document.getElementById('effort-val').textContent = (val / 1000).toFixed(1) + ' N';
+        }
+
+        async function moveGripper(val, effortInput = null) {
             const statusEl = document.getElementById('status');
             statusEl.textContent = 'Sending gripper command...';
 
@@ -369,11 +382,13 @@
             document.getElementById('gripper').value = val;
             document.getElementById('gripper-val').textContent = val;
 
+            const effort = effortInput !== null ? effortInput : parseInt(document.getElementById('gripper-effort').value);
+
             try {
                 const response = await fetch('/api/move_gripper', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ gripper: parseInt(val) })
+                    body: JSON.stringify({ gripper: parseInt(val), effort: effort })
                 });
                 const result = await response.json();
                 if (result.success) {
@@ -844,6 +859,7 @@
             const j5 = parseFloat(document.getElementById('fb_j5').value) || 0;
             const j6 = parseFloat(document.getElementById('fb_j6').value) || 0;
             const gripper = parseInt(document.getElementById('gripper').value) || 0;
+            const effort = parseInt(document.getElementById('gripper-effort').value) || 1000;
 
             const pose = {
                 type: 'pose',
@@ -851,6 +867,7 @@
                 joints: [j1, j2, j3, j4, j5, j6],
                 end_pose: latestPose ? [latestPose.x, latestPose.y, latestPose.z, latestPose.rx, latestPose.ry, latestPose.rz] : [0, 0, 0, 0, 0, 0],
                 gripper: gripper,
+                effort: effort, // Store effort
                 speed: 50,
                 duration: 2000,
                 move_mode: 0x01 // Default: Joint Move (0x01)
@@ -861,10 +878,12 @@
         }
 
         function addGripperAction(val) {
+            const effort = parseInt(document.getElementById('gripper-effort').value) || 1000;
             const action = {
                 type: 'gripper',
                 name: val > 50 ? 'Gripper Open' : 'Gripper Close',
                 value: val,
+                effort: effort, // Store effort
                 speed: 100, // Not used for gripper but kept for consistency
                 duration: 500
             };
@@ -936,7 +955,7 @@
                 span.className = 'pose-conf';
 
                 if (item.type === 'gripper') {
-                    span.textContent = `Action: Set Gripper to ${item.value}`;
+                    span.textContent = ``; // Inputs provided
                 } else {
                     span.textContent = `[${item.joints.map(j => Math.round(j)).join(', ')}] G:${item.gripper}`;
                 }
@@ -946,7 +965,7 @@
                 btnPlay.className = 'btn-sm secondary';
                 btnPlay.textContent = '▶';
                 btnPlay.onclick = () => {
-                    if (item.type === 'gripper') moveGripper(item.value);
+                    if (item.type === 'gripper') moveGripper(item.value, item.effort || 1000);
                     else moveToPose(item);
                 };
 
@@ -957,10 +976,54 @@
                 btnDel.onclick = () => deletePose(index);
 
                 li.appendChild(inputName);
+
+                // Helper to add label
+                const addLbl = (txt) => {
+                    const s = document.createElement('span');
+                    s.textContent = txt;
+                    s.style.fontSize = '12px';
+                    s.style.color = '#888';
+                    s.style.marginLeft = '5px';
+                    s.style.marginRight = '2px';
+                    li.appendChild(s);
+                };
+
                 if (item.type === 'pose') {
+                    addLbl('Spd:');
                     li.appendChild(inputSpeed);
                     li.appendChild(lblLin); // Add Checkbox
+                } else if (item.type === 'gripper') {
+                    // Gripper Pos
+                    const inputGripPos = document.createElement('input');
+                    inputGripPos.type = 'number';
+                    inputGripPos.className = 'pose-name';
+                    inputGripPos.value = item.value;
+                    inputGripPos.placeholder = 'Pos';
+                    inputGripPos.title = 'Position (0-100)';
+                    inputGripPos.style.width = '50px';
+                    inputGripPos.style.flexGrow = '0';
+                    inputGripPos.onchange = (e) => {
+                        item.value = parseInt(e.target.value);
+                        span.textContent = ``; // Clear text as we have inputs
+                    };
+                    addLbl('Pos:');
+                    li.appendChild(inputGripPos);
+
+                    // Gripper Effort
+                    const inputGripEff = document.createElement('input');
+                    inputGripEff.type = 'number';
+                    inputGripEff.className = 'pose-name';
+                    inputGripEff.value = item.effort || 1000;
+                    inputGripEff.placeholder = 'Force';
+                    inputGripEff.title = 'Force (100-5000)';
+                    inputGripEff.style.width = '60px';
+                    inputGripEff.style.flexGrow = '0';
+                    inputGripEff.onchange = (e) => { item.effort = parseInt(e.target.value); };
+                    addLbl('Force:');
+                    li.appendChild(inputGripEff);
                 }
+
+                addLbl('Wait:');
                 li.appendChild(inputDur);
                 li.appendChild(span);
                 li.appendChild(btnPlay);
@@ -987,8 +1050,7 @@
                 j5: pose.joints[4],
                 j6: pose.joints[5],
                 gripper: pose.gripper,
-                j6: pose.joints[5],
-                gripper: pose.gripper,
+                effort: pose.effort || 1000, // Send effort
                 speed: pose.speed || 50,
                 move_mode: pose.move_mode || 0x01,
                 end_pose: pose.end_pose
@@ -1033,7 +1095,7 @@
 
                 const item = poseList[i];
                 if (item.type === 'gripper') {
-                    await moveGripper(item.value);
+                    await moveGripper(item.value, item.effort || 1000); // Pass effort
                 } else {
                     await moveToPose(item);
                 }

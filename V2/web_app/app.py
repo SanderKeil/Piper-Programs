@@ -21,8 +21,8 @@ app_running = True
 # Synchronization
 heartbeat_lock = threading.Lock()
 # Dynamic config: [ctrl_mode, move_mode, speed]
-# Default: CAN Control (0x01), Joint Mode (0x01), Speed 50, Gripper Enable (0x01)
-current_move_config = {"ctrl_mode": 0x01, "move_mode": 0x01, "speed": 50, "gripper_code": 0x01}
+# Default: CAN Control (0x01), Joint Mode (0x01), Speed 50, Gripper Enable (0x01), Effort 1000
+current_move_config = {"ctrl_mode": 0x01, "move_mode": 0x01, "speed": 50, "gripper_code": 0x01, "gripper_effort": 1000}
 
 # Global Targets (Integer units as per SDK)
 target_joints = [0, 0, 0, 0, 0, 0]
@@ -287,7 +287,8 @@ def heartbeat_loop():
                 
                 # 3. Send Gripper Command
                 g_code = current_move_config.get("gripper_code", 0x01)
-                piper.GripperCtrl(abs(target_gripper), 1000, g_code, 0)
+                g_effort = current_move_config.get("gripper_effort", 1000)
+                piper.GripperCtrl(abs(target_gripper), g_effort, g_code, 0)
                 
                 # DEBUG PROBE (Every ~1 second)
                 hb_count += 1
@@ -429,6 +430,14 @@ def move_robot_joints():
         # Clamp speed 0-100
         speed_req = max(0, min(100, speed_req))
         current_move_config["speed"] = speed_req
+        
+        # Read Gripper and Effort
+        if 'gripper' in data:
+            target_gripper = int(float(data.get('gripper', 0)) * 1000)
+            
+        if 'effort' in data:
+             eff_req = int(data.get('effort', 1000))
+             current_move_config["gripper_effort"] = eff_req
 
         # NOTE: Actual command sending is now handled by heartbeat_loop
         
@@ -452,6 +461,10 @@ def move_gripper():
         
         # Update Target
         target_gripper = gripper_um
+        
+        # Update Effort if provided
+        if 'effort' in data:
+            current_move_config["gripper_effort"] = int(data.get('effort', 1000))
         
         # Reset Gripper Code to 0x01 (Standard Enable) after explicit move
         current_move_config["gripper_code"] = 0x01

@@ -122,18 +122,28 @@
         <div class="control-group" style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
             <h3 style="grid-column: span 2; margin-top: 0; color: var(--primary-color);">Pose Sequencer</h3>
 
-            <div style="grid-column: span 2; display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
-                <button class="secondary" onclick="capturePose()">Capture Current Pose</button>
-                <button class="secondary" onclick="addGripperAction(0)">Add Gripper Close</button>
-                <button class="secondary" onclick="addGripperAction(100)">Add Gripper Open</button>
-                <div style="width: 1px; background: #666; margin: 0 5px;"></div>
+            <div class="toolbar" style="grid-column: span 2;">
+                <button class="secondary" onclick="capturePose()">+ Pose</button>
+                <button class="secondary" onclick="addGripperAction(0)">+ Close</button>
+                <button class="secondary" onclick="addGripperAction(100)">+ Open</button>
+                <button class="secondary" onclick="addFolder()">+ Folder</button>
+
+                <div style="width: 1px; height:20px; background: #666; margin: 0 5px;"></div>
+
+                <button class="secondary" onclick="cutSelection()">Cut</button>
+                <button class="secondary" onclick="copySelection()">Copy</button>
+                <button class="secondary" onclick="pasteSelection()">Paste</button>
+
+                <div style="width: 1px; height:20px; background: #666; margin: 0 5px;"></div>
+
                 <button class="secondary" onclick="saveSequence()">Save</button>
                 <button class="secondary" onclick="document.getElementById('load-file').click()">Load</button>
                 <input type="file" id="load-file" style="display: none;" accept=".json" onchange="loadSequence(this)">
-                <div style="width: 1px; background: #666; margin: 0 5px;"></div>
-                <button class="primary" onclick="playSequence()">Play Sequence</button>
-                <button class="error-btn" style="background-color: var(--error-color); color: white;"
-                    onclick="stopSequence()">Stop</button>
+
+                <div style="width: 1px; height:20px; background: #666; margin: 0 5px;"></div>
+
+                <button class="primary" onclick="playSequence()">▶ Play</button>
+                <button class="error-btn" onclick="stopSequence()">■ Stop</button>
             </div>
 
             <div class="input-group" style="grid-column: span 2;">

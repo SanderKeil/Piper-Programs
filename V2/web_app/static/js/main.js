@@ -182,8 +182,7 @@ async function moveEndPose() {
         z: parseFloat(document.getElementById('ep_z').value),
         rx: parseFloat(document.getElementById('ep_rx').value),
         ry: parseFloat(document.getElementById('ep_ry').value),
-        rz: parseFloat(document.getElementById('ep_rz').value),
-        gripper: parseInt(document.getElementById('gripper').value)
+        rz: parseFloat(document.getElementById('ep_rz').value)
     };
 
     try {
@@ -217,8 +216,7 @@ async function moveJoints() {
         j3: parseFloat(document.getElementById('j3').value),
         j4: parseFloat(document.getElementById('j4').value),
         j5: parseFloat(document.getElementById('j5').value),
-        j6: parseFloat(document.getElementById('j6').value),
-        gripper: parseInt(document.getElementById('gripper').value)
+        j6: parseFloat(document.getElementById('j6').value)
     };
 
     try {
@@ -254,8 +252,6 @@ async function moveToPose(pose) {
         j4: pose.joints[3],
         j5: pose.joints[4],
         j6: pose.joints[5],
-        gripper: pose.gripper,
-        effort: pose.effort || 1000,
         speed: pose.speed || 50,
         move_mode: pose.move_mode || 0x01,
         end_pose: pose.end_pose
@@ -388,7 +384,7 @@ function renderPoseList() {
         if (item.type === 'gripper') {
             span.textContent = ``;
         } else {
-            span.textContent = `[${item.joints.map(j => Math.round(j)).join(', ')}] G:${item.gripper}`;
+            span.textContent = `[${item.joints.map(j => Math.round(j)).join(', ')}]`;
         }
 
         // Play Button

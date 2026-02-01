@@ -1,0 +1,242 @@
+:root {
+    --bg-color: #121212;
+    --surface-color: #1e1e1e;
+    --primary-color: #bb86fc;
+    --secondary-color: #03dac6;
+    --text-color: #ffffff;
+    --error-color: #cf6679;
+}
+
+body {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    flex-wrap: wrap;
+}
+
+.container {
+    background-color: var(--surface-color);
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    max-width: 800px;
+}
+
+#canvas-container {
+    background-color: #000;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    max-width: 600px;
+    height: 600px;
+    position: relative;
+    overflow: hidden;
+}
+
+h1 {
+    color: var(--primary-color);
+    margin: 0;
+}
+
+.header-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-can {
+    background-color: var(--secondary-color);
+    color: #000;
+}
+
+.status-teach {
+    background-color: #ff9800;
+    color: #000;
+}
+
+.status-standby {
+    background-color: #555;
+    color: #fff;
+}
+
+.status-offline {
+    background-color: #333;
+    color: #777;
+    border: 1px solid #555;
+}
+
+.control-group {
+    gap: 15px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+}
+
+label {
+    margin-bottom: 5px;
+    font-size: 0.9em;
+    color: #aaa;
+}
+
+input {
+    background-color: #2c2c2c;
+    border: 1px solid #333;
+    color: white;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 16px;
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.buttons {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+button {
+    padding: 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    font-weight: bold;
+}
+
+button.primary {
+    background-color: var(--primary-color);
+    color: black;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+#status {
+    margin-top: 20px;
+    text-align: center;
+    min-height: 20px;
+    font-size: 0.9em;
+}
+
+.success {
+    color: var(--secondary-color);
+}
+
+.error {
+    color: var(--error-color);
+}
+
+/* Tab Styles */
+.tab-header {
+    display: flex;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #333;
+}
+
+.tab-btn {
+    background: transparent;
+    border: none;
+    color: #888;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 16px;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: #ddd;
+}
+
+.tab-btn.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.right-column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+    max-width: 600px;
+}
+
+#pose-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    grid-column: span 2;
+}
+
+.pose-item {
+    background: #2c2c2c;
+    margin-bottom: 8px;
+    padding: 10px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid #444;
+    cursor: grab;
+}
+
+.pose-item.dragging {
+    opacity: 0.5;
+    border-color: var(--primary-color);
+}
+
+.pose-name {
+    flex-grow: 1;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1em;
+    cursor: text;
+}
+
+.pose-conf {
+    font-family: monospace;
+    font-size: 0.8em;
+    color: #888;
+}
+
+.btn-sm {
+    padding: 5px 10px;
+    font-size: 0.8em;
+}

@@ -162,6 +162,27 @@ class RobotController:
             if effort: self.current_move_config["gripper_effort"] = effort
             self.current_move_config["gripper_code"] = config.GRIPPER_ENABLE
 
+    def stop(self):
+        """Instantly stops the robot."""
+        if not self.piper: return False, "Not connected"
+        
+        with self.lock:
+            print("Stopping robot...")
+            # 1. Emergency Stop (0x01)
+            # emergency_stop=0x01, track_ctrl=0x00, grag_teach_ctrl=0x00
+            self.piper.MotionCtrl_1(0x01, 0x00, 0x00)
+            
+            # Wait briefly for stop to take effect
+            time.sleep(0.05)
+            
+            # 2. Sync targets to current state to prevent resume jump
+            self._sync_targets()
+            
+            # 3. Resume (0x02) to allow new commands
+            self.piper.MotionCtrl_1(0x02, 0x00, 0x00)
+            
+            return True, "Stopped"
+
     def get_state(self):
         if not self.piper: return None
         

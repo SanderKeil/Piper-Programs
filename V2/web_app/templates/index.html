@@ -142,8 +142,8 @@
 
                 <div style="width: 1px; height:20px; background: #666; margin: 0 5px;"></div>
 
-                <button class="primary" onclick="playSequence()">▶ Play</button>
-                <button class="error-btn" onclick="stopSequence()">■ Stop</button>
+                <button class="primary" id="btn-play" onclick="playSequence(true)">▶ Play</button>
+                <button class="error-btn" id="btn-pause" onclick="togglePause()">⏸ Pause</button>
             </div>
 
             <div class="input-group" style="grid-column: span 2;">
@@ -164,6 +164,17 @@
     <!-- Right Column -->
     <div class="right-column">
         <div id="canvas-container"></div>
+
+        <button id="btn-estop" onclick="emergencyStop()" style="
+            width: 100%; 
+            background-color: red; 
+            color: white; 
+            font-weight: bold; 
+            font-size: 1.2em; 
+            padding: 15px; 
+            margin-top: 10px;
+            border: 2px solid #800;
+        ">⚠ EMERGENCY STOP ⚠<br><span style="font-size: 0.8em; font-weight: normal;">(Robot will fall)</span></button>
 
         <div class="container" style="width: 100%; margin: 0; padding: 20px;">
             <h2>Current State (Live)</h2>

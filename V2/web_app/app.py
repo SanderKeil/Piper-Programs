@@ -116,11 +116,23 @@ def move_pose():
         # Handle gripper if present in payload
         if 'gripper' in data:
             g_val = int(float(data.get('gripper', 0)) * 1000)
-            robot_ctrl.update_gripper(g_val)
+            effort = int(data.get('effort', config.DEFAULT_GRIPPER_EFFORT)) # Use config default
+            robot_ctrl.update_gripper(g_val, effort)
             
-        return jsonify({'success': True, 'message': 'Command sent'})
+        return jsonify({'success': True}) # Changed message to match snippet
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/stop', methods=['POST'])
+def stop_robot():
+    if not robot_ctrl.piper:
+        return jsonify({'success': False, 'message': 'Robot not connected'})
+    
+    success, msg = robot_ctrl.stop()
+    if success:
+        return jsonify({'success': True, 'message': msg})
+    else:
+        return jsonify({'success': False, 'message': msg}), 500
 
 @app.route('/api/move_joints', methods=['POST'])
 def move_joints():

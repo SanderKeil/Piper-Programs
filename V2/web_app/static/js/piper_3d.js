@@ -30,7 +30,7 @@ window.Piper3D = (function () {
         return m;
     }
 
-    function buildPiperModel() {
+    function buildPiperModel(targetScene) {
         const matLink = new THREE.MeshPhongMaterial({ color: 0xeeeeee });
         const matJoint = new THREE.MeshPhongMaterial({ color: 0x333333 });
         const matGripper = new THREE.MeshPhongMaterial({ color: 0x555555 });
@@ -40,7 +40,7 @@ window.Piper3D = (function () {
         // Root group to align Z-up robot to Y-up scene
         const robotRoot = new THREE.Group();
         robotRoot.rotation.x = -Math.PI / 2;
-        scene.add(robotRoot);
+        targetScene.add(robotRoot);
 
         let parent = robotRoot;
 
@@ -135,13 +135,74 @@ window.Piper3D = (function () {
         return jointGroups;
     }
 
+    // --- Thumbnail Logic ---
+    let thumbScene, thumbCamera, thumbRenderer, thumbJointGroups = [];
+
+    function initThumbSystem() {
+        thumbScene = new THREE.Scene();
+        thumbScene.background = new THREE.Color(0x333333); // Dark background for icon
+
+        // Small square aspect
+        thumbCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 10);
+        thumbCamera.position.set(0.6, 0.4, 0.6); // Slightly closer/different angle?
+        thumbCamera.lookAt(0, 0.1, 0);
+
+        thumbRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        thumbRenderer.setSize(128, 128); // Higher res for larger icon
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        thumbScene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(2, 5, 2);
+        thumbScene.add(dirLight);
+
+        thumbJointGroups = buildPiperModel(thumbScene);
+    }
+
+    function generateThumbnail(joints, gripperValue) {
+        if (!thumbRenderer) initThumbSystem();
+
+        // Update Thumb Robot
+        // Copied from update() logic but for thumbJointGroups
+        for (let i = 0; i < 6; i++) {
+            const group = thumbJointGroups[i];
+            const deg = joints[i] || 0;
+            const rad = deg * Math.PI / 180;
+            const p = DHParams[i];
+            const currentTheta = rad + p.theta;
+            const m = calculateLinkMatrix(p.alpha, p.a, currentTheta, p.d);
+            group.matrix.copy(m);
+            group.matrixAutoUpdate = false;
+        }
+
+        // Update Gripper
+        if (gripperValue === undefined) gripperValue = 0;
+        const halfWidth = (gripperValue / 1000.0) / 2.0;
+
+        const g6 = thumbJointGroups[5];
+        const fingerL = g6.getObjectByName("FingerL");
+        const fingerR = g6.getObjectByName("FingerR");
+
+        if (fingerL && fingerR) {
+            const minPos = 0.015;
+            fingerL.position.x = minPos + halfWidth;
+            fingerR.position.x = -(minPos + halfWidth);
+        }
+
+        // Render
+        thumbRenderer.render(thumbScene, thumbCamera);
+        return thumbRenderer.domElement.toDataURL('image/png');
+    }
+
     function init() {
         console.log("Initializing Piper3D...");
         const container = document.getElementById('canvas-container');
         if (!container) {
             console.error("Canvas container not found!");
             return;
-        } const width = container.clientWidth;
+        }
+        const width = container.clientWidth;
         const height = container.clientHeight;
 
         scene = new THREE.Scene();
@@ -171,7 +232,7 @@ window.Piper3D = (function () {
         controls.enableDamping = true;
         controls.target.set(0, 0.2, 0);
 
-        robotJointGroups = buildPiperModel();
+        robotJointGroups = buildPiperModel(scene);
 
         function animate() {
             requestAnimationFrame(animate);
@@ -187,6 +248,9 @@ window.Piper3D = (function () {
             camera.updateProjectionMatrix();
             renderer.setSize(w, h);
         });
+
+        // Initialize thumb system proactively
+        initThumbSystem();
     }
 
     function update(angles, gripperValue) {
@@ -219,7 +283,8 @@ window.Piper3D = (function () {
 
     return {
         init: init,
-        update: update
+        update: update,
+        generateThumbnail: generateThumbnail
     };
 
 })();
